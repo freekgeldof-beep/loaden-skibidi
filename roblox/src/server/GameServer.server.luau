@@ -42,6 +42,7 @@ local GameState = remote("GameState") -- server vertelt: golf, baas, game over
 -- Spelstatus
 ---------------------------------------------------------------------
 Map.build()
+print("[Loaden Skibidi] server gestart")
 
 local enemyFolder = Instance.new("Folder")
 enemyFolder.Name = "Vijanden"
@@ -125,6 +126,69 @@ local function effectRing(pos: Vector3, color: Color3, radius: number)
 	Debris:AddItem(p, 0.4)
 end
 
+-- Zwevend schade-getal boven een vijand
+local function damageNumber(pos: Vector3, amount: number)
+	local anchor = Instance.new("Part")
+	anchor.Anchored = true
+	anchor.CanCollide = false
+	anchor.CanQuery = false
+	anchor.CanTouch = false
+	anchor.Transparency = 1
+	anchor.Size = Vector3.one * 0.2
+	anchor.Position = pos + Vector3.new(rng:NextNumber(-1.5, 1.5), 4, rng:NextNumber(-1.5, 1.5))
+	local bb = Instance.new("BillboardGui")
+	bb.Size = UDim2.fromOffset(90, 40)
+	bb.AlwaysOnTop = true
+	bb.Parent = anchor
+	local t = Instance.new("TextLabel")
+	t.Size = UDim2.fromScale(1, 1)
+	t.BackgroundTransparency = 1
+	t.Text = tostring(math.floor(amount + 0.5))
+	t.TextScaled = true
+	t.Font = Enum.Font.GothamBlack
+	t.TextColor3 = if amount >= 25 then Color3.fromRGB(255, 120, 40) else Color3.fromRGB(255, 230, 80)
+	t.TextStrokeTransparency = 0
+	t.Parent = bb
+	anchor.Parent = workspace
+	TweenService:Create(anchor, TweenInfo.new(0.8), { Position = anchor.Position + Vector3.new(0, 5, 0) }):Play()
+	TweenService:Create(t, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
+	Debris:AddItem(anchor, 0.8)
+end
+
+-- Hartje: geeft leven terug als je erdoorheen loopt
+local function dropHeart(pos: Vector3)
+	local heart = Instance.new("Part")
+	heart.Name = "Hartje"
+	heart.Shape = Enum.PartType.Ball
+	heart.Size = Vector3.one * 2.2
+	heart.Color = Color3.fromRGB(80, 255, 120)
+	heart.Material = Enum.Material.Neon
+	heart.Anchored = true
+	heart.CanCollide = false
+	heart.Position = Vector3.new(pos.X, 2.5, pos.Z)
+	local light = Instance.new("PointLight")
+	light.Color = heart.Color
+	light.Range = 10
+	light.Parent = heart
+	heart.Parent = workspace
+	TweenService:Create(heart, TweenInfo.new(0.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { Position = heart.Position + Vector3.new(0, 1.2, 0) }):Play()
+	local used = false
+	heart.Touched:Connect(function(hit)
+		if used then
+			return
+		end
+		local hum = hit.Parent and hit.Parent:FindFirstChildOfClass("Humanoid")
+		local plr = hit.Parent and Players:GetPlayerFromCharacter(hit.Parent)
+		if hum and plr and hum.Health > 0 then
+			used = true
+			hum.Health = math.min(hum.MaxHealth, hum.Health + hum.MaxHealth * 0.3)
+			effectBall(heart.Position, heart.Color, 2, 8, 0.3)
+			heart:Destroy()
+		end
+	end)
+	Debris:AddItem(heart, 20)
+end
+
 local function addScore(player: Player?, points: number, kill: boolean)
 	if not player then
 		return
@@ -158,6 +222,7 @@ local function damageEnemy(e, amount: number, attacker: Player?, fromPos: Vector
 	end
 	e.lastAttacker = attacker
 	e.humanoid:TakeDamage(amount)
+	damageNumber(e.root.Position, amount)
 	flashHit(e.model, Color3.new(1, 1, 1))
 	if stun > 0 then
 		e.stunUntil = math.max(e.stunUntil, os.clock() + stun)
@@ -319,6 +384,7 @@ local function spawnEnemy(kind: string, tint: Color3, bossKind: string?)
 	pcall(function()
 		root:SetNetworkOwner(nil) -- de server bestuurt de vijand
 	end)
+	Models.animate(hum)
 
 	hum.Died:Connect(function()
 		if e.dead then
@@ -327,6 +393,9 @@ local function spawnEnemy(kind: string, tint: Color3, bossKind: string?)
 		e.dead = true
 		addScore(e.lastAttacker, if bossKind then 500 + wave * 20 else 100 + wave * 10, true)
 		effectBall(root.Position, tint, 2, 12, 0.4)
+		if bossKind or rng:NextNumber() < 0.2 then
+			dropHeart(root.Position)
+		end
 		Debris:AddItem(model, 1.5)
 		local i = table.find(enemies, e)
 		if i then
@@ -525,7 +594,24 @@ local function applyCharacter(player: Player, character: Model)
 	end
 	character:WaitForChild("Head", 10)
 	character:WaitForChild("HumanoidRootPart", 10)
+	-- Wacht tot de avatar helemaal geladen is. Anders vervangt Roblox het hoofd
+	-- daarna nog, en valt het kostuum eraf (daardoor was het eerst onzichtbaar).
+	local waited = 0
+	while not player:HasAppearanceLoaded() and waited < 8 do
+		waited += task.wait(0.1)
+	end
+	task.wait(0.2)
+	if player.Character ~= character or chosen[player] ~= kind then
+		return
+	end
 	Models.dress(character, kind, Color3.fromRGB(255, 210, 63))
+	-- Extra check: is het hoofd toch nog vervangen? Dan opnieuw aankleden.
+	local headAtDress = character:FindFirstChild("Head")
+	task.delay(1.5, function()
+		if player.Character == character and character:FindFirstChild("Head") ~= headAtDress then
+			Models.dress(character, kind, Color3.fromRGB(255, 210, 63))
+		end
+	end)
 	hum.MaxHealth = T.hp
 	hum.Health = T.hp
 	hum.WalkSpeed = T.speed

@@ -141,7 +141,7 @@ local playBtn = new("TextButton", {
 	Size = UDim2.new(0, 240, 0, 60),
 }, menu)
 corner(playBtn, 14)
-label(menu, "WASD lopen · Shift rennen · Spatie springen · Klik aanval · Q speciaal · E dash", 15, {
+label(menu, "WASD lopen · Shift rennen · Spatie springen · Klik aanval · Q speciaal · E dash · M muziek", 15, {
 	Position = UDim2.new(0, 0, 0.8, 72),
 	Font = Enum.Font.GothamMedium,
 	TextColor3 = Color3.fromRGB(200, 200, 220),

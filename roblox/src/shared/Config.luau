@@ -22,18 +22,21 @@ Config.Characters = {
 		name = "Camera Man", hp = 85, speed = 19, dmg = 12, special = "flash",
 		desc = "Snel. Speciaal: flits die vijanden verlamt.",
 		costume = "camera", color = Color3.fromRGB(60, 60, 70), scale = 1,
+		suit = Color3.fromRGB(25, 25, 30), tie = Color3.fromRGB(200, 30, 40),
 		stats = { 0.4, 0.95, 0.5 },
 	},
 	speaker = {
 		name = "Speaker Man", hp = 100, speed = 14, dmg = 14, special = "shockwave",
 		desc = "Speciaal: bass-schokgolf om je heen.",
 		costume = "speaker", color = Color3.fromRGB(35, 35, 40), scale = 1,
+		suit = Color3.fromRGB(55, 55, 65), tie = Color3.fromRGB(140, 60, 220),
 		stats = { 0.55, 0.55, 0.6 },
 	},
 	tv = {
 		name = "TV Man", hp = 160, speed = 12, dmg = 22, special = "blast",
 		desc = "Zware tank. Langzaam maar sterk.",
 		costume = "tv", color = Color3.fromRGB(90, 90, 100), scale = 1,
+		suit = Color3.fromRGB(30, 40, 80), tie = Color3.fromRGB(60, 200, 255),
 		stats = { 1, 0.35, 1 },
 	},
 	titan = {
@@ -74,5 +77,12 @@ Config.EnemyTints = {
 }
 Config.EnemySpeedCap = 17
 Config.BossHp = { titan = 650, gman = 480 }
+
+-- Muziek
+-- Leeg ("") = het spel speelt zijn eigen muziekje met piepjes.
+-- Wil je echte muziek? Zoek in de Toolbox (Gereedschapskist) bij Audio een liedje,
+-- kopieer het nummer (ID) en zet het hier, bijvoorbeeld "rbxassetid://1234567890".
+Config.MusicId = ""
+Config.MusicVolume = 0.35
 
 return Config
