@@ -33,6 +33,7 @@
   .cd span{position:relative}
   #msg{position:absolute;top:22%;left:0;right:0;text-align:center;font-size:clamp(28px,6vw,58px);font-weight:900;color:var(--acc);opacity:0;transition:opacity .4s}
   #cross{position:absolute;left:50%;top:50%;width:8px;height:8px;margin:-4px;border:2px solid #fff9;border-radius:50%}
+  #mini{position:absolute;right:16px;bottom:16px;border-radius:50%;border:3px solid #fff6;background:#0009}
   #hint{position:absolute;bottom:14px;left:0;right:0;text-align:center;font-size:14px;opacity:.7}
 </style>
 </head>
@@ -66,6 +67,8 @@
     </div>
   </div>
   <div class="tr"><div id="wave">Wave 1</div><div id="score">Score 0</div><div id="left" style="font-size:15px;opacity:.8"></div></div>
+  <div id="boss" style="display:none;position:absolute;top:14px;left:50%;transform:translateX(-50%);width:min(420px,36vw);text-align:center;font-weight:700"><div id="bossName" style="color:#ff7a8a"></div><div class="hp"><i id="bossFill"></i></div></div>
+  <canvas id="mini" width="170" height="170"></canvas>
   <div id="cross"></div>
   <div id="msg"></div>
   <div id="hint">Klik in het spel om de muis te vangen</div>
@@ -83,8 +86,10 @@ const TYPES = {
   camera:   {name:'Camera Man',     hp:85,  speed:9.5, dmg:12, special:'flash',     desc:'Snel. Speciaal: flits die vijanden verlamt.', stats:[.4,.95,.5]},
   speaker:  {name:'Speaker Man',    hp:100, speed:7,   dmg:14, special:'shockwave', desc:'Speciaal: bass-schokgolf om je heen.', stats:[.55,.55,.6]},
   tv:       {name:'TV Man',         hp:160, speed:5.8, dmg:22, special:'blast',     desc:'Zware tank. Langzaam maar sterk.', stats:[1,.35,1]},
+  titan:    {name:'Titan Cameraman', hp:240, speed:5.2, dmg:28, special:'shockwave', desc:'Gigantische reus. Stampt de grond kapot.', stats:[1,.3,1], scale:2.4, mass:3},
+  gman:     {name:'G-Man',          hp:105, speed:8.6, dmg:16, special:'blast',     desc:'Gevaarlijke toilet-baas. Snel en dodelijk.', stats:[.65,.9,.55]},
 };
-const ENEMY_KEYS = Object.keys(TYPES);
+const ENEMY_KEYS = ['toilet','camera','speaker','tv'];
 
 const mat = (c,o={}) => new THREE.MeshLambertMaterial({color:c,...o});
 const box = (w,h,d,m) => new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);
@@ -100,6 +105,7 @@ function makeModel(type, tint){
   const g = new THREE.Group();
   const white = mat(0xf2f2f2), dark = mat(0x16161c), skin = mat(0xe8b48c);
   const accent = mat(tint);
+  if(type==='titan'){ const m = makeModel('camera',tint); return m; }
   if(type==='toilet'){
     const bowl = cyl(.75,.45,.9,white); bowl.position.y=.5; g.add(bowl);
     const rim = new THREE.Mesh(new THREE.TorusGeometry(.75,.12,8,20),white); rim.rotation.x=Math.PI/2; rim.position.y=.95; g.add(rim);
@@ -111,6 +117,18 @@ function makeModel(type, tint){
       const b=box(.25,.05,.05,dark); b.position.set(.2*s,1.8,.45); b.rotation.z=-.3*s; g.add(b);}
     const mouth = box(.32,.1,.05,mat(0x7a1020)); mouth.position.set(0,1.28,.47); g.add(mouth);
     g.userData.hop=true; g.userData.top=2.3;
+  } else if(type==='gman'){
+    const suit = mat(0x2b2b33), pale = mat(0xd9c3a5);
+    addLimbs(g,suit);
+    const body = box(.9,1,.5,suit); body.position.y=1.4; g.add(body);
+    const tie = box(.12,.7,.05,accent); tie.position.set(0,1.4,.27); g.add(tie);
+    for(const s of [-1,1]){ const a=box(.22,.85,.25,suit); a.position.set(.58*s,1.45,0); g.add(a);}
+    const head = sph(.75,pale); head.position.y=2.45; head.scale.set(1,1.1,1); g.add(head);
+    const hair = box(1.3,.25,1.2,dark); hair.position.set(0,3.05,-.05); g.add(hair);
+    for(const s of [-1,1]){ const e=sph(.14,mat(0xffffff)); e.position.set(.28*s,2.55,.62); g.add(e); const p=sph(.07,mat(0x335)); p.position.set(.28*s,2.55,.74); g.add(p);}
+    const brow = box(.8,.1,.1,dark); brow.position.set(0,2.8,.68); g.add(brow);
+    const grin = box(.5,.07,.05,mat(0x401010)); grin.position.set(0,2.15,.72); g.add(grin);
+    g.userData.top=3.4;
   } else {
     const suit = mat(type==='camera'?0x15151a:type==='speaker'?0x20202a:0x1a1a22);
     addLimbs(g,suit);
@@ -297,14 +315,15 @@ for(const [k,t] of Object.entries(TYPES)){
 function makeFighter(type, isPlayer, tint, hpMul=1){
   const T = TYPES[type];
   const model = makeModel(type, tint);
+  model.userData.base = T.scale||1;
   const root = new THREE.Group(); root.add(model); scene.add(root);
   const f = {type, T, root, model, isPlayer, hp:T.hp*hpMul, maxhp:T.hp*hpMul, speed:T.speed, dmg:T.dmg,
-    heading:0, vy:0, onGround:true, kb:new THREE.Vector3(), cd:{a:0,s:0,d:0}, stun:0, swing:0, dashT:0, anim:0, atkT:rand(0,1), radius:.9};
+    heading:0, vy:0, onGround:true, kb:new THREE.Vector3(), cd:{a:0,s:0,d:0}, stun:0, swing:0, dashT:0, anim:0, atkT:rand(0,1), radius:.9*(T.scale||1), reach:3.6*Math.pow(T.scale||1,.75), mass:T.mass||1, tpT:4};
   if(!isPlayer){
     const bg = new THREE.Mesh(new THREE.PlaneGeometry(1.8,.2), new THREE.MeshBasicMaterial({color:0x000000,depthTest:false}));
     const fg = new THREE.Mesh(new THREE.PlaneGeometry(1.8,.2), new THREE.MeshBasicMaterial({color:0xff4d6d,depthTest:false}));
     fg.position.z=.01; bg.renderOrder=10; fg.renderOrder=11;
-    const bar = new THREE.Group(); bar.add(bg,fg); bar.position.y=model.userData.top+.5; root.add(bar);
+    const bar = new THREE.Group(); bar.add(bg,fg); bar.position.y=model.userData.top*(T.scale||1)+.5; root.add(bar);
     f.bar=bar; f.barFill=fg;
   }
   return f;
@@ -312,6 +331,7 @@ function makeFighter(type, isPlayer, tint, hpMul=1){
 const rand=(a,b)=>a+Math.random()*(b-a);
 
 function startGame(){
+  if(!mapImg) buildMap();
   for(const e of enemies) scene.remove(e.root);
   for(const p of projectiles) scene.remove(p.mesh);
   for(const p of pickups) scene.remove(p.mesh);
@@ -328,7 +348,8 @@ function startGame(){
 
 function nextWave(){
   wave++;
-  const n = 2+wave*2;
+  const isBoss = wave%5===0;
+  const n = isBoss ? Math.max(2,Math.floor(wave/2)) : 2+wave*2;
   for(let i=0;i<n;i++){
     const a=Math.random()*Math.PI*2, r=rand(35,70);
     const type = ENEMY_KEYS[Math.floor(Math.random()*ENEMY_KEYS.length)];
@@ -339,7 +360,15 @@ function nextWave(){
     collide(e.root.position,e.radius);
     enemies.push(e);
   }
-  showMsg(`WAVE ${wave}`);
+  if(isBoss){
+    const type = (wave/5)%2===1 ? 'titan' : 'gman', a=Math.random()*Math.PI*2;
+    const b = makeFighter(type,false,0xff2222,1);
+    b.boss=type; b.hp=b.maxhp=(type==='titan'?650:480)*(1+wave*.07);
+    b.speed=b.T.speed*.85; b.dmg=(type==='titan'?18:10)+wave;
+    b.root.position.set(player.root.position.x+Math.cos(a)*45,.3,player.root.position.z+Math.sin(a)*45);
+    collide(b.root.position,b.radius); enemies.push(b);
+    showMsg(`BAAS: ${b.T.name.toUpperCase()}`); beep(80,.8,'sawtooth',.12,-30);
+  } else showMsg(`WAVE ${wave}`);
 }
 const T_SPEED_CAP = 8.5;
 
@@ -356,17 +385,17 @@ function damage(f,amt,from,knock=8,stun=0){
   if(f.hp<=0) return;
   f.hp-=amt; f.stun=Math.max(f.stun,stun);
   const dir = f.root.position.clone().sub(from).setY(0).normalize();
-  f.kb.addScaledVector(dir,knock);
+  f.kb.addScaledVector(dir,knock/f.mass);
   spark(f.root.position.clone().setY(f.root.position.y+1.5), f.isPlayer?0xff4d6d:0xffd23f);
   beep(f.isPlayer?140:220,.12,'sawtooth',.07,-80);
   if(f.hp<=0) die(f);
 }
 function die(f){
   if(f.isPlayer){ endGame(); return; }
-  kills++; score += 100 + wave*10;
+  kills++; score += 100 + wave*10 + (f.boss?500:0);
   spark(f.root.position.clone().setY(f.root.position.y+1.5),0xffffff,18);
   beep(500,.25,'triangle',.08,-350);
-  if(Math.random()<.3){
+  if(f.boss||Math.random()<.3){
     const m = sph(.5,mat(0x4dff9a,{emissive:0x15aa55})); m.position.copy(f.root.position).setY(1.2); scene.add(m);
     pickups.push({mesh:m});
   }
@@ -385,23 +414,25 @@ function melee(f, targets){
   for(const t of targets){
     const d = t.root.position.clone().sub(f.root.position).setY(0);
     const dist = d.length();
-    if(dist<3.6 && (dist<1.2 || d.normalize().dot(forward)>.25)) damage(t,f.dmg,f.root.position,9);
+    if(dist<f.reach && (dist<1.2 || d.normalize().dot(forward)>.25)) damage(t,f.dmg,f.root.position,9);
   }
 }
 function shoot(f, kind){
-  const dir = fwd(f); const p = f.root.position.clone(); p.y+=1.6; p.addScaledVector(dir,1.2);
+  const dir = fwd(f); const sc=f.model.userData.base||1, p = f.root.position.clone(); p.y+=1.6*sc; p.addScaledVector(dir,1.2*sc);
   const flash = kind==='flash', eproj = kind==='enemy';
   const m = sph(flash?.5:.4, new THREE.MeshBasicMaterial({color: flash?0xffffff: eproj?0xff4d6d:0x66ffcc}));
   m.position.copy(p); scene.add(m);
   projectiles.push({mesh:m,vel:dir.multiplyScalar(eproj?22:34),dmg:eproj?f.dmg:f.dmg*1.8,life:1.8,fromPlayer:f.isPlayer,stun:flash?1.8:0});
   beep(flash?900:600,.15,'sawtooth',.05,-300);
 }
-function shockwave(f){
-  const ring = new THREE.Mesh(new THREE.RingGeometry(.5,1,32),new THREE.MeshBasicMaterial({color:0xb36bff,side:THREE.DoubleSide,transparent:true,opacity:.8}));
+function shockwave(f,r=9,color=0xb36bff,stun=.8){
+  const ring = new THREE.Mesh(new THREE.RingGeometry(.5,1,32),new THREE.MeshBasicMaterial({color,side:THREE.DoubleSide,transparent:true,opacity:.8}));
   ring.rotation.x=-Math.PI/2; ring.position.copy(f.root.position).setY(.5); scene.add(ring);
-  particles.push({m:ring,ring:true,life:.45,max:.45});
+  particles.push({m:ring,ring:true,life:.45,max:.45,r});
   beep(70,.4,'sine',.15,-30);
-  for(const e of enemies){ if(e.root.position.distanceTo(f.root.position)<9) damage(e,f.dmg*1.8,f.root.position,18,.8); }
+  for(const t of (f.isPlayer?enemies.slice():[player])){
+    if(t.root.position.distanceTo(f.root.position)<r && (f.isPlayer||t.root.position.y<2.2)) damage(t,f.dmg*(f.isPlayer?1.8:1.3),f.root.position,18,stun);
+  }
 }
 
 /* ---------- input ---------- */
@@ -435,7 +466,7 @@ function useSpecial(){
   if(player.cd.s>0) return;
   player.heading = yaw; // face where camera looks
   const s=player.T.special;
-  if(s==='shockwave') shockwave(player); else shoot(player,s);
+  if(s==='shockwave') shockwave(player,player.type==='titan'?13:9); else shoot(player,s);
   player.cd.s = s==='shockwave'?5:3;
 }
 function useDash(){
@@ -459,7 +490,7 @@ function animateFighter(f,dt,moving){
   if(m.userData.hop){ m.position.y = moving ? Math.abs(Math.sin(f.anim*.8))*.45 : Math.sin(f.anim)*.04; m.rotation.z = moving? Math.sin(f.anim*.8)*.06:0; }
   else if(m.userData.legs){ const s=moving?Math.sin(f.anim)*.7:0; m.userData.legs[0].rotation.x=s; m.userData.legs[1].rotation.x=-s; m.position.y=moving?Math.abs(Math.sin(f.anim))*.1:0; }
   const sw = f.swing>0 ? 1+Math.sin((1-f.swing/.25)*Math.PI)*.25 : 1;
-  m.scale.setScalar(sw);
+  m.scale.setScalar(sw*(m.userData.base||1));
   m.rotation.x = f.swing>0 ? -Math.sin((1-f.swing/.25)*Math.PI)*.35 : 0;
   m.visible = true;
 }
@@ -494,14 +525,22 @@ function update(dt){
     // separation
     const sep = new THREE.Vector3();
     for(const o of enemies){ if(o===e) continue; const dd=e.root.position.clone().sub(o.root.position).setY(0); const l=dd.length(); if(l<2.2&&l>.01) sep.addScaledVector(dd,1/l*(2.2-l)); }
-    const wish = to.clone().multiplyScalar(dist>2.4?1:0).addScaledVector(sep,.6);
+    const wish = to.clone().multiplyScalar(dist>e.reach-1.2?1:0).addScaledVector(sep,.6);
     const ranged = e.type==='speaker'||e.type==='camera';
     if(ranged && dist<14 && dist>6) wish.multiplyScalar(.1);
     if(e.stun<=0){ e.heading=Math.atan2(to.x,to.z); }
     physics(e,dt,wish,e.speed);
     if(e.stun<=0){
-      if(dist<3 && e.cd.a<=0){ melee(e,[P]); e.cd.a=1.1+Math.random()*.4; }
+      if(dist<e.reach-.6 && e.cd.a<=0){ melee(e,[P]); e.cd.a=1.1+Math.random()*.4; }
       else if(ranged && dist<30 && dist>6 && e.atkT<=0){ shoot(e,'enemy'); e.atkT=rand(2.2,3.6); }
+    }
+    if(e.boss && e.stun<=0){
+      if(e.boss==='titan' && e.atkT<=0 && dist<14){ shockwave(e,11,0xff7a1a,.35); e.atkT=rand(3,4.5); }
+      if(e.boss==='gman'){
+        if(e.atkT<=0 && dist<40){ const h=e.heading; for(const o of [-.28,0,.28]){ e.heading=h+o; shoot(e,'enemy'); } e.heading=h; e.atkT=rand(1.6,2.4); }
+        e.tpT-=dt;
+        if(e.tpT<=0){ spark(e.root.position.clone().setY(2),0xb36bff,14); const a=Math.random()*Math.PI*2; e.root.position.set(pp.x+Math.cos(a)*9,.3,pp.z+Math.sin(a)*9); collide(e.root.position,e.radius); spark(e.root.position.clone().setY(2),0xb36bff,14); e.tpT=rand(5,8); beep(1200,.2,'sine',.06,-900); }
+      }
     }
     e.root.rotation.y=e.heading; animateFighter(e,dt,wish.lengthSq()>.05);
     e.bar.quaternion.copy(camera.quaternion);
@@ -523,7 +562,7 @@ function update(dt){
   // particles
   for(let i=particles.length-1;i>=0;i--){
     const p=particles[i]; p.life-=dt;
-    if(p.ring){ const s=1+(1-p.life/p.max)*9; p.m.scale.set(s,s,s); p.m.material.opacity=Math.max(0,p.life/p.max); }
+    if(p.ring){ const s=1+(1-p.life/p.max)*(p.r||9); p.m.scale.set(s,s,s); p.m.material.opacity=Math.max(0,p.life/p.max); }
     else { p.v.y-=18*dt; p.m.position.addScaledVector(p.v,dt); p.m.scale.multiplyScalar(.96); }
     if(p.life<=0){ scene.remove(p.m); particles.splice(i,1); }
   }
@@ -535,8 +574,8 @@ function update(dt){
   if(enemies.length===0 && state==='play'){ P.hp=Math.min(P.maxhp,P.hp+15); score+=50*wave; nextWave(); }
 
   // camera
-  const cp=Math.cos(pitch), sp=Math.sin(pitch), dist=10;
-  const target=pp.clone().setY(pp.y+2);
+  const cp=Math.cos(pitch), sp=Math.sin(pitch), bs=P.model.userData.base||1, dist=10*Math.pow(bs,.7);
+  const target=pp.clone().setY(pp.y+2*Math.pow(bs,.8));
   const cam=new THREE.Vector3(target.x-Math.sin(yaw)*cp*dist, Math.max(1,target.y+sp*dist), target.z-Math.cos(yaw)*cp*dist);
   camera.position.lerp(cam,Math.min(1,dt*14)); camera.lookAt(target.x,target.y+.6,target.z);
   sun.position.set(pp.x+60,100,pp.z+40); sun.target.position.copy(pp);
@@ -546,7 +585,36 @@ function update(dt){
   const cds={cdA:[P.cd.a,.38],cdS:[P.cd.s,P.T.special==='shockwave'?5:3],cdD:[P.cd.d,2.5]};
   for(const [id,[v,m]] of Object.entries(cds)) $(id).firstElementChild.style.height=(v/m*100)+'%';
   $('wave').textContent='Wave '+wave; $('score').textContent='Score '+score; $('left').textContent=enemies.length+' vijanden';
+  const boss = enemies.find(e=>e.boss);
+  $('boss').style.display = boss?'block':'none';
+  if(boss){ $('bossName').textContent=boss.T.name; $('bossFill').style.width=Math.max(0,boss.hp/boss.maxhp*100)+'%'; }
+  drawMini(pp);
   if(msgT>0){ msgT-=dt; if(msgT<=0) $('msg').style.opacity=0; }
+}
+
+/* ---------- minimap ---------- */
+const mctx = $('mini').getContext('2d'); let mapImg, mapS;
+function buildMap(){
+  mapS = CELL*HALF+40; const c=document.createElement('canvas'); c.width=c.height=mapS*2; const x=c.getContext('2d');
+  x.fillStyle='#2a2840'; x.fillRect(0,0,mapS*2,mapS*2);
+  x.fillStyle='#0b0a14';
+  for(let i=-HALF;i<=HALF+1;i++){ const p=(i-.5)*CELL+mapS; x.fillRect(p-ROAD/2,0,ROAD,mapS*2); x.fillRect(0,p-ROAD/2,mapS*2,ROAD); }
+  x.fillStyle='#6c63b8'; for(const b of colliders) x.fillRect(b.minX+mapS,b.minZ+mapS,b.maxX-b.minX,b.maxZ-b.minZ);
+  x.fillStyle='#ffd23f'; x.beginPath(); x.arc(mapS,mapS,10,0,7); x.fill();
+  mapImg=c;
+}
+function drawMini(pp){
+  const R=85, sc=1.1, cs=Math.cos(yaw), sn=Math.sin(yaw);
+  mctx.setTransform(1,0,0,1,0,0); mctx.clearRect(0,0,170,170);
+  mctx.save(); mctx.beginPath(); mctx.arc(R,R,R,0,7); mctx.clip();
+  mctx.setTransform(-sc*cs,-sc*sn,sc*sn,-sc*cs,R,R); mctx.translate(-pp.x,-pp.z);
+  mctx.drawImage(mapImg,-mapS,-mapS);
+  const dot=(p,r,col)=>{ mctx.fillStyle=col; mctx.beginPath(); mctx.arc(p.x,p.z,r/sc,0,7); mctx.fill(); };
+  for(const k of pickups) dot(k.mesh.position,3.5,'#4dff9a');
+  for(const e of enemies) dot(e.root.position,e.boss?7:4,e.boss?'#ff7a1a':'#ff4d6d');
+  mctx.setTransform(1,0,0,1,0,0);
+  mctx.fillStyle='#ffd23f'; mctx.beginPath(); mctx.moveTo(R,R-7); mctx.lineTo(R+5,R+5); mctx.lineTo(R-5,R+5); mctx.closePath(); mctx.fill();
+  mctx.restore();
 }
 
 /* ---------- loop ---------- */
@@ -557,7 +625,7 @@ renderer.setAnimationLoop(()=>{
   if(state==='play') update(dt); else menuCam(clock.elapsedTime);
   renderer.render(scene,camera);
 });
-window.__game = {get state(){return state}, get player(){return player}, get enemies(){return enemies}, startGame, select:k=>selected=k};
+window.__game = {get state(){return state}, get player(){return player}, get enemies(){return enemies}, startGame, select:k=>selected=k, jump:n=>{for(const e of enemies)scene.remove(e.root);enemies=[];wave=n-1;nextWave();}};
 </script>
 </body>
 </html>
