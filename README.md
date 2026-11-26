@@ -1,5 +1,7 @@
 # Loaden Skibidi
 
+> **Roblox-versie:** het spel wordt omgezet naar Roblox. Kijk in de map [`roblox/`](roblox/README.md) voor de Luau-scripts en de stappen in Roblox Studio.
+
 3D third-person skibidi-vechtspel in de stad **Alphahills**, gebouwd met [three.js](https://threejs.org).
 Kies een karakter en versla golven vijanden, inclusief baas-gevechten.
 
@@ -35,6 +37,7 @@ index.html        pagina en HUD
 src/style.css     styling
 src/main.js       spel: karakters, stad, gevecht, AI, minimap
 vendor/           three.js (lokaal, geen CDN nodig)
+roblox/           Roblox-versie (Luau-scripts, Rojo-project)
 ```
 
 ## Ideeën
