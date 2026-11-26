@@ -1,0 +1,12 @@
+{
+  "name": "loaden-skibidi",
+  "version": "0.2.0",
+  "description": "3D third-person skibidi-vechtspel in de stad Alphahills (three.js)",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "npx http-server . -p 8080 -c-1",
+    "dev": "npx http-server . -p 8080 -c-1 -o"
+  },
+  "license": "MIT"
+}
