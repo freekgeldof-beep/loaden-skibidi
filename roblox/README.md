@@ -15,7 +15,13 @@ De eerste versie heeft de basis: karakter kiezen, vechten en golven vijanden met
 
 De namen moeten **precies** kloppen (hoofdletters ook), anders vinden de scripts elkaar niet.
 
-## Manier 1: Kopiëren en plakken (makkelijkst)
+## Manier 0: Eén bestand openen (het allermakkelijkst)
+
+1. Maak het bestand met `python3 roblox/build_place.py` (of vraag Claude erom).
+2. Dubbelklik op `LoadenSkibidi.rbxlx`. Roblox Studio opent het spel met alle scripts al op de goede plek.
+3. Druk op **F5** om te spelen.
+
+## Manier 1: Kopiëren en plakken
 
 1. Open **Roblox Studio** en kies **Baseplate** (nieuw spel).
 2. Zet de vensters **Explorer** en **Properties** aan via het tabblad **View**.
